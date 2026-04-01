@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Upload PDF</h2>
+
+<form action="http://127.0.0.1:8000/api/documents/upload/" method="post" enctype="multipart/form-data">
+    <input type="file" name="file"><br><br>
+    <button type="submit">Upload</button>
+</form>
+
+<hr>
+
+<h2>Ask Question</h2>
+
+<form action="http://127.0.0.1:8000/api/chat/ask/" method="post">
+    <input type="text" name="question" placeholder="Ask something..." style="width:300px;"><br><br>
+    <button type="submit">Ask</button>
+</form>
+
+</body>
+</html>
