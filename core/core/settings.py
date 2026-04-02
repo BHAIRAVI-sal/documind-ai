@@ -3,15 +3,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load .env from project root (one level above core/)
-# Auto-fix UTF-16 encoding if Windows saved it that way
 ENV_PATH = Path(__file__).resolve().parent.parent.parent / '.env'
 if ENV_PATH.exists():
     raw = ENV_PATH.read_bytes()
-    # Detect UTF-16 BOM (0xff 0xfe) and convert to UTF-8
     if raw[:2] in (b'\xff\xfe', b'\xfe\xff'):
         text = raw.decode('utf-16')
         ENV_PATH.write_text(text, encoding='utf-8')
-        print("⚡ Auto-fixed .env from UTF-16 to UTF-8")
     load_dotenv(ENV_PATH)
 
 # Base directory
@@ -19,9 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Security
 SECRET_KEY = 'django-insecure-change-this-key'
-
 DEBUG = True
-
 ALLOWED_HOSTS = []
 
 # Installed apps
@@ -35,12 +30,13 @@ INSTALLED_APPS = [
 
     # Third-party
     'rest_framework',
+    'corsheaders',
+    'rest_framework_simplejwt',
 
     # Local apps
     'accounts',
     'documents',
     'chat',
-    'corsheaders',
 ]
 
 # Middleware
@@ -76,7 +72,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# Database (we will switch to PostgreSQL later)
+# Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -100,17 +96,31 @@ USE_TZ = True
 
 # Static files
 STATIC_URL = 'static/'
-
-# Default primary key
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
 AUTH_USER_MODEL = 'accounts.User'
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+}
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
