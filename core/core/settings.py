@@ -1,4 +1,18 @@
+import os
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from project root (one level above core/)
+# Auto-fix UTF-16 encoding if Windows saved it that way
+ENV_PATH = Path(__file__).resolve().parent.parent.parent / '.env'
+if ENV_PATH.exists():
+    raw = ENV_PATH.read_bytes()
+    # Detect UTF-16 BOM (0xff 0xfe) and convert to UTF-8
+    if raw[:2] in (b'\xff\xfe', b'\xfe\xff'):
+        text = raw.decode('utf-16')
+        ENV_PATH.write_text(text, encoding='utf-8')
+        print("⚡ Auto-fixed .env from UTF-16 to UTF-8")
+    load_dotenv(ENV_PATH)
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -97,6 +111,6 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-GEMINI_API_KEY = "AIzaSyCiWHap8ZUW0yOYEEffXrah2A7y0WqAYz8"
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 CORS_ALLOW_ALL_ORIGINS = True

@@ -9,8 +9,21 @@ from accounts.models import User
 
 
 class ChatWithDocumentView(APIView):
+    # Free Gemini Flash models whitelist
+    ALLOWED_MODELS = [
+        "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-1.5-flash",
+    ]
+
     def post(self, request):
         question = request.data.get("question")
+        model = request.data.get("model", "gemini-2.5-flash")
+
+        # Validate model
+        if model not in self.ALLOWED_MODELS:
+            model = "gemini-2.5-flash"
 
         if not question:
             return Response({"error": "No question provided"}, status=400)
@@ -24,11 +37,13 @@ class ChatWithDocumentView(APIView):
                 pdf_reader = PyPDF2.PdfReader(document.file.path)
 
                 for page in pdf_reader.pages:
-                    text += page.extract_text()
+                    extracted = page.extract_text()
+                    if extracted:
+                        text += extracted
 
             context = text[:15000]
 
-            # 🔥 HYBRID PROMPT
+            # 🔥 PROMPT
             prompt = f"""
             You are a helpful AI assistant.
 
@@ -42,7 +57,8 @@ class ChatWithDocumentView(APIView):
             {question}
             """
 
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+            # 🔥 API CALL (SECURE) - uses selected model
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
 
             data = {
                 "contents": [
@@ -57,15 +73,28 @@ class ChatWithDocumentView(APIView):
             response = requests.post(url, json=data)
             result = response.json()
 
+            print("🔥 Gemini API status:", response.status_code)
+            print("🔥 Gemini API response:", str(result)[:300])
+
+            # 🔥 HANDLE API ERRORS
+            if response.status_code == 429:
+                return Response({
+                    "answer": "⚠️ API rate limit reached. Please wait a moment and try again."
+                })
+
+            if response.status_code != 200:
+                return Response({
+                    "answer": f"⚠️ API error ({response.status_code}). Please check your Gemini API key."
+                })
+
             if "candidates" not in result:
                 return Response({
-                    "error": "API issue",
-                    "full_response": result
+                    "answer": "⚠️ No response from AI. The API returned an unexpected format."
                 })
 
             answer = result['candidates'][0]['content']['parts'][0]['text']
 
-            # 🔥 SAVE CHAT HISTORY
+            # 🔥 SAVE CHAT
             user = User.objects.first()
 
             ChatMessage.objects.create(
@@ -74,14 +103,10 @@ class ChatWithDocumentView(APIView):
                 answer=answer
             )
 
-            return Response({
-                "answer": answer
-            })
+            return Response({"answer": answer})
 
         except Exception as e:
-            return Response({
-                "error": str(e)
-            }, status=500)
+            return Response({"error": str(e)}, status=500)
 
 
 class ChatHistoryView(APIView):
