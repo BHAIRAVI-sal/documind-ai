@@ -37,45 +37,57 @@ const Login = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1>DocuMind AI 🤖</h1>
-          <p>Login to your account</p>
+    <div className="auth-split">
+      {/* LEFT — Illustration Panel */}
+      <div className="auth-hero">
+        <img src="/astronaut.png" alt="DocuMind AI" className="auth-hero-img" />
+        <div className="auth-hero-overlay">
+          <h2>Welcome to<br />DocuMind AI</h2>
+          <p>Your AI companion for smarter documents</p>
         </div>
+      </div>
 
-        <form onSubmit={handleLogin} className="auth-form">
-          <div className="form-group">
-            <label>Email Address</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@example.com"
-              required
-            />
+      {/* RIGHT — Form Panel (ALL LOGIC IDENTICAL) */}
+      <div className="auth-container">
+        <div className="auth-card">
+          <div className="auth-header">
+            <h1>Welcome Back</h1>
+            <p className="auth-subtitle">Sign in to continue to DocuMind AI</p>
           </div>
 
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
+          <form onSubmit={handleLogin} className="auth-form">
+            <div className="form-group">
+              <label>Email Address</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@example.com"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {error && <div className="auth-error">{error}</div>}
+
+            <button type="submit" className="auth-submit-btn" disabled={loading}>
+              {loading ? "Logging in..." : "Login"}
+            </button>
+          </form>
+
+          <div className="auth-footer">
+            Don't have an account? <Link to="/signup">Signup</Link>
           </div>
-
-          {error && <div className="auth-error">{error}</div>}
-
-          <button type="submit" className="auth-submit-btn" disabled={loading}>
-            {loading ? "Logging in..." : "Sign In"}
-          </button>
-        </form>
-
-        <div className="auth-footer">
-          Don't have an account? <Link to="/signup">Create Account</Link>
         </div>
       </div>
     </div>

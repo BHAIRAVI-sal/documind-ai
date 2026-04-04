@@ -1,35 +1,51 @@
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
 from .models import Document
 from .serializers import DocumentSerializer
-from accounts.models import User
 import PyPDF2
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
 
 class UploadDocumentView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
     def post(self, request):
-        file = request.FILES.get('file')
+        files = request.FILES.getlist('file')
 
-        if not file:
-            return Response({"error": "No file provided"}, status=400)
+        if not files:
+            return Response({"error": "No file(s) provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.first()
+        uploaded_documents = []
+        total_text_extracted = ""
 
-        # Save document
-        document = Document.objects.create(
-            user=user,
-            file=file
-        )
-
-        # 🔥 READ PDF TEXT
-        pdf_reader = PyPDF2.PdfReader(document.file.path)
-        text = ""
-
-        for page in pdf_reader.pages:
-            text += page.extract_text()
+        # 🔥 Iterate through all uploaded files
+        for file in files:
+            # Save document for the logged-in user
+            document = Document.objects.create(
+                user=request.user,
+                file=file
+            )
+            
+            # 🔥 READ PDF TEXT (Robust extraction for each file)
+            try:
+                pdf_reader = PyPDF2.PdfReader(document.file.path)
+                file_text = ""
+                for page in pdf_reader.pages:
+                    extracted = page.extract_text()
+                    if extracted:
+                        file_text += extracted
+                
+                # Combine text from all files for the preview response
+                total_text_extracted += f"\n--- {file.name} ---\n{file_text}"
+                uploaded_documents.append({
+                    "id": document.id,
+                    "name": file.name
+                })
+            except Exception as e:
+                print(f"🔥 Error extracting text from {file.name}: {e}")
 
         return Response({
-            "message": "File uploaded successfully",
-            "extracted_text": text[:1000]  # first 1000 chars
+            "message": f"{len(files)} file(s) uploaded successfully",
+            "uploaded_files": uploaded_documents,
+            "extracted_text_preview": total_text_extracted[:2000] if total_text_extracted else "No text found."
         }, status=status.HTTP_201_CREATED)

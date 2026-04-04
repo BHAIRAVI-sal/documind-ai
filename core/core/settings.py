@@ -5,11 +5,10 @@ from dotenv import load_dotenv
 # Load .env from project root (one level above core/)
 ENV_PATH = Path(__file__).resolve().parent.parent.parent / '.env'
 if ENV_PATH.exists():
-    raw = ENV_PATH.read_bytes()
-    if raw[:2] in (b'\xff\xfe', b'\xfe\xff'):
-        text = raw.decode('utf-16')
-        ENV_PATH.write_text(text, encoding='utf-8')
     load_dotenv(ENV_PATH)
+    print(f"✅ [DEBUG] .env loaded from: {ENV_PATH}")
+else:
+    print(f"⚠️ [WARNING] .env file NOT FOUND at: {ENV_PATH}")
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -104,6 +103,13 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+GROK_API_KEY = os.environ.get("GROK_API_KEY")
+HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
+
+# --- AI API KEYS DIAGNOSTICS ---
+print("GEMINI LOADED:", bool(GEMINI_API_KEY))
+print("GROK LOADED:", bool(GROK_API_KEY))
+print("HF LOADED:", bool(HUGGINGFACE_API_KEY))
 
 CORS_ALLOW_ALL_ORIGINS = True
 

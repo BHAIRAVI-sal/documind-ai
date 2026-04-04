@@ -39,7 +39,6 @@ const Signup = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Automatically log in or redirect to login
         alert("Account created successfully! Please login.");
         navigate("/login");
       } else {
@@ -54,71 +53,83 @@ const Signup = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1>DocuMind AI 🤖</h1>
-          <p>Create a new account</p>
+    <div className="auth-split">
+      {/* LEFT — Illustration Panel */}
+      <div className="auth-hero">
+        <img src="/astronaut.png" alt="DocuMind AI" className="auth-hero-img" />
+        <div className="auth-hero-overlay">
+          <h2>Start Your<br />Journey Today</h2>
+          <p>Join thousands using AI-powered documents</p>
         </div>
+      </div>
 
-        <form onSubmit={handleSignup} className="auth-form">
-          <div className="form-group">
-            <label>Full Name</label>
-            <input
-              name="full_name"
-              type="text"
-              value={formData.full_name}
-              onChange={handleChange}
-              placeholder="John Doe"
-              required
-            />
+      {/* RIGHT — Form Panel (ALL LOGIC IDENTICAL) */}
+      <div className="auth-container">
+        <div className="auth-card">
+          <div className="auth-header">
+            <h1>Create Account</h1>
+            <p className="auth-subtitle">Get started with DocuMind AI for free</p>
           </div>
 
-          <div className="form-group">
-            <label>Email Address</label>
-            <input
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="name@example.com"
-              required
-            />
+          <form onSubmit={handleSignup} className="auth-form">
+            <div className="form-group">
+              <label>Full Name</label>
+              <input
+                name="full_name"
+                type="text"
+                value={formData.full_name}
+                onChange={handleChange}
+                placeholder="John Doe"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Email Address</label>
+              <input
+                name="email"
+                type="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="name@example.com"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                name="password"
+                type="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Confirm Password</label>
+              <input
+                name="confirm_password"
+                type="password"
+                value={formData.confirm_password}
+                onChange={handleChange}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {error && <div className="auth-error">{error}</div>}
+
+            <button type="submit" className="auth-submit-btn" disabled={loading}>
+              {loading ? "Creating account..." : "Sign up"}
+            </button>
+          </form>
+
+          <div className="auth-footer">
+            Already have an account? <Link to="/login">Login</Link>
           </div>
-
-          <div className="form-group">
-            <label>Password</label>
-            <input
-              name="password"
-              type="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Confirm Password</label>
-            <input
-              name="confirm_password"
-              type="password"
-              value={formData.confirm_password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              required
-            />
-          </div>
-
-          {error && <div className="auth-error">{error}</div>}
-
-          <button type="submit" className="auth-submit-btn" disabled={loading}>
-            {loading ? "Creating account..." : "Sign Up"}
-          </button>
-        </form>
-
-        <div className="auth-footer">
-          Already have an account? <Link to="/login">Sign In</Link>
         </div>
       </div>
     </div>

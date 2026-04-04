@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import "./App.css";
 
@@ -6,12 +6,6 @@ import "./App.css";
 import Login from "./components/auth/Login";
 import Signup from "./components/auth/Signup";
 
-const MODELS = [
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
-  { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
-  { id: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
-];
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -20,7 +14,59 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
-// Main Chat Component (Extracted from old App)
+// ─── File Preview Modal Component ───
+const FilePreviewModal = ({ isOpen, onClose, url, fileName }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="preview-header">
+          <div className="preview-info">
+            <span className="preview-icon">📄</span>
+            <span className="preview-filename">{fileName}</span>
+          </div>
+          <button className="preview-close" onClick={onClose}>✕</button>
+        </header>
+        <div className="preview-body">
+          <iframe src={url} title="File Preview" className="preview-iframe" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Report Modal (Full Screen Edit/View) ───
+const ReportModal = ({ isOpen, onClose, text, onSave }) => {
+  const [editedText, setEditedText] = useState(text);
+  useEffect(() => setEditedText(text), [text]);
+  if (!isOpen) return null;
+
+  return (
+    <div className="preview-overlay" onClick={onClose}>
+      <div className="report-modal" onClick={(e) => e.stopPropagation()}>
+        <header className="preview-header">
+          <div className="preview-info">
+            <span className="preview-icon">📊</span>
+            <span className="preview-filename">AI Detailed Report</span>
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button className="save-report-btn" onClick={() => onSave(editedText)}>Save Changes</button>
+            <button className="preview-close" onClick={onClose}>✕</button>
+          </div>
+        </header>
+        <div className="report-body">
+          <textarea 
+            className="report-textarea" 
+            value={editedText} 
+            onChange={(e) => setEditedText(e.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Main Chat Component
 function ChatInterface() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState(() => {
@@ -32,16 +78,35 @@ function ChatInterface() {
     return localStorage.getItem("documind_active_session_id") || "";
   });
 
+  const [theme, setTheme] = useState(localStorage.getItem("documind_theme") || "light");
   const [question, setQuestion] = useState("");
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [model, setModel] = useState("gemini-2.5-flash");
+  const [model, setModel] = useState("gemini-2.5-flash"); // 💎 Switched to requested 2.5 Flash
 
   const [menuOpenId, setMenuOpenId] = useState(null);
-  const [editingSessionId, setEditingSessionId] = useState(null);
+  const [editingSessionId, setEditingSessionId] = useState(null); const [sprinkles, setSprinkles] = useState([]);
   const [tempTitle, setTempTitle] = useState("");
+  const [isUploaded, setIsUploaded] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  // 💎 Feature State
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewFileName, setPreviewFileName] = useState("");
+  
+  // ✏️ Editable Reports State
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editDraft, setEditDraft] = useState("");
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportValue, setReportValue] = useState("");
 
   const chatBoxRef = useRef(null);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("documind_theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     if (chatBoxRef.current) {
@@ -62,6 +127,13 @@ function ChatInterface() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
+  const handleNewChat = useCallback(() => {
+    const newSession = { id: crypto.randomUUID(), title: "New Conversation", messages: [], isPinned: false };
+    setSessions(prev => [newSession, ...prev]);
+    setActiveSessionId(newSession.id);
+    setQuestion("");
+  }, []); // [] because it only depends on state setters which are stable
+
   useEffect(() => {
     const syncHistory = async () => {
       try {
@@ -71,6 +143,7 @@ function ChatInterface() {
         });
         const backendHistory = await res.json();
 
+        // ?? Smart Grouping: If user has no sessions, group all backend data into ONE legacy session
         if (sessions.length === 0 && Array.isArray(backendHistory) && backendHistory.length > 0) {
           const legacyMessages = backendHistory.map(item => ([
             { role: "user", text: item.question },
@@ -79,14 +152,14 @@ function ChatInterface() {
 
           const legacySession = {
             id: "legacy-" + Date.now(),
-            title: backendHistory[0].question.substring(0, 30) + "...",
+            title: "Imported History", // ?? Clearer name
             messages: legacyMessages,
             isPinned: false
           };
-
           setSessions([legacySession]);
           setActiveSessionId(legacySession.id);
         } else if (sessions.length === 0) {
+          // If totally fresh with no history, start a new chat
           handleNewChat();
         }
       } catch (e) {
@@ -95,38 +168,16 @@ function ChatInterface() {
       }
     };
     syncHistory();
-  }, []);
-
-  const handleNewChat = () => {
-    const newSession = {
-      id: crypto.randomUUID(),
-      title: "New Conversation",
-      messages: [],
-      isPinned: false
-    };
-    setSessions([newSession, ...sessions]);
-    setActiveSessionId(newSession.id);
-    setQuestion("");
-  };
+  }, [handleNewChat, sessions.length]);
 
   const askAI = async (customQuestion) => {
     if (!activeSessionId) return;
     const token = localStorage.getItem("documind_token");
-
-    setSessions(prev => prev.map(s => {
-      if (s.id === activeSessionId) {
-        return { ...s, messages: [...s.messages, { role: "user", text: customQuestion }] };
-      }
-      return s;
-    }));
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: [...s.messages, { role: "user", text: customQuestion }] } : s));
     setLoading(true);
     try {
       const res = await fetch("http://127.0.0.1:8000/api/chat/ask/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
+        method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ question: customQuestion, model: model }),
       });
       const data = await res.json();
@@ -139,73 +190,66 @@ function ChatInterface() {
         }
         return s;
       }));
-    } catch (error) {
-      console.error("Error asking AI:", error);
-      setLoading(false);
-    }
+    } catch (error) { console.error("Error asking AI:", error); setLoading(false); }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("documind_token");
-    localStorage.removeItem("documind_refresh");
-    navigate("/login");
-  };
-
-  const handleAsk = () => {
-    if (!question) return;
-    askAI(question);
-    setQuestion("");
-  };
+  const handleAsk = () => { if (!question) return; askAI(question); setQuestion(""); };
 
   const handleUpload = async () => {
-    if (!file) return alert("Select file");
+    if (files.length === 0) return alert("Select at least one file");
     const token = localStorage.getItem("documind_token");
     const formData = new FormData();
-    formData.append("file", file);
+    Array.from(files).forEach(f => formData.append("file", f));
+    setUploading(true);
     try {
-      await fetch("http://127.0.0.1:8000/api/documents/upload/", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` },
-        body: formData,
+      const res = await fetch("http://127.0.0.1:8000/api/documents/upload/", {
+        method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData,
       });
-      alert("PDF Uploaded ✅");
-    } catch (error) {
-      console.error("Error uploading:", error);
-    }
+      if (res.ok) { setIsUploaded(true); alert(`${files.length} PDF(s) Uploaded Successfully ✅`); }
+      else { const err = await res.json(); alert(err.error || "Upload failed"); }
+    } catch (error) { console.error("Error uploading:", error); alert("Server connection failed"); } finally { setUploading(false); }
   };
 
-  const toggleMenu = (e, id) => {
-    e.stopPropagation();
-    setMenuOpenId(menuOpenId === id ? null : id);
+  // 💎 Helpers
+  const openPreview = (file) => { const url = URL.createObjectURL(file); setPreviewUrl(url); setPreviewFileName(file.name); setIsPreviewOpen(true); };
+  const closePreview = () => { if (previewUrl) URL.revokeObjectURL(previewUrl); setPreviewUrl(null); setIsPreviewOpen(false); };
+  const removeFile = (index) => { const newFiles = [...files]; newFiles.splice(index, 1); setFiles(newFiles); if (newFiles.length === 0) setIsUploaded(false); };
+  
+  // ✏️ Editable Report Logic
+  const startEditing = (idx, text) => { setEditingIndex(idx); setEditDraft(text); };
+  
+  // 🎇 Sprinkle Animation Logic — Balanced Interaction
+  const triggerSprinkle = (e, emoji) => {
+    const rect = e.target.getBoundingClientRect();
+    const count = 7; // 💎 Precisely 7 for a clean burst
+    const newSprinkles = Array.from({ length: count }).map((_, i) => ({
+      id: Math.random(),
+      emoji: emoji,
+      x: rect.left + rect.width / 2,
+      y: rect.top,
+      vx: (Math.random() - 0.5) * window.innerWidth * 0.8,
+      vy: -Math.random() * window.innerHeight * 0.8,
+    }));
+    setSprinkles(prev => [...prev, ...newSprinkles]);
+    setTimeout(() => {
+      setSprinkles(prev => prev.filter(s => !newSprinkles.includes(s)));
+    }, 2200);
   };
 
-  const handlePin = (id) => {
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, isPinned: !s.isPinned } : s));
-    setMenuOpenId(null);
+  const saveEdit = (idx) => {
+    setSessions(prev => prev.map(s => s.id === activeSessionId ? {
+      ...s, messages: s.messages.map((m, i) => i === idx ? { ...m, text: editDraft } : m)
+    } : s));
+    setEditingIndex(null);
   };
-
-  const startRename = (id, currentTitle) => {
-    setEditingSessionId(id);
-    setTempTitle(currentTitle);
-    setMenuOpenId(null);
-  };
-
-  const saveRename = (e, id) => {
-    if (e.key === "Enter") {
-      setSessions(prev => prev.map(s => s.id === id ? { ...s, title: tempTitle } : s));
-      setEditingSessionId(null);
-    }
-    if (e.key === "Escape") setEditingSessionId(null);
-  };
-
-  const handleDelete = (e, id) => {
-    e.stopPropagation();
-    const newSessions = sessions.filter(s => s.id !== id);
-    setSessions(newSessions);
-    if (activeSessionId === id) {
-      setActiveSessionId(newSessions.length > 0 ? newSessions[0].id : "");
-    }
-    setMenuOpenId(null);
+  const exportToWord = (text) => {
+    const blob = new Blob(['\ufeff', text], { type: 'application/msword' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = "DocuMind_Report.doc";
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   const sortedSessions = [...sessions].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
@@ -215,110 +259,196 @@ function ChatInterface() {
   return (
     <div className="container">
       <aside className="sidebar">
-        <button className="new-chat-btn" onClick={handleNewChat}>
-          <span>+</span> New Chat
-        </button>
+        <button className="new-chat-btn" onClick={handleNewChat}><span>+</span> New Chat</button>
+        
+        {/* 📂 Document Controls (Now in Sidebar) */}
+        <div className="sidebar-upload-section">
+          <h3>Document Controls</h3>
+          <div className="upload-card-compact">
+            <input type="file" multiple id="file-upload" className="hidden-input" onChange={(e) => { setFiles(Array.from(e.target.files)); setIsUploaded(false); }} />
+            <label htmlFor="file-upload" className="sidebar-upload-trigger">
+              📂 {files.length > 0 ? `${files.length} Selected` : 'Choose PDFs'}
+            </label>
+            
+            {files.length > 0 && (
+              <div className="selection-list-sidebar">
+                {Array.from(files).map((file, idx) => (
+                  <div key={idx} className="file-tile-sidebar">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                      <button className="tile-btn-sm eye" onClick={() => openPreview(file)} title="View PDF">👁️</button>
+                      <span className="file-tile-name">{file.name}</span>
+                    </div>
+                    <button className="tile-btn-sm" onClick={() => removeFile(idx)}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            <button className="sidebar-primary-btn" onClick={handleUpload} disabled={uploading || files.length === 0}>
+              {uploading ? "⏳ Uploading..." : "✨ Upload PDFs"}
+            </button>
+          </div>
+        </div>
 
         <h3>Recent Conversations</h3>
         <div className="history-container">
           {sortedSessions.map((s) => (
-            <div
-              key={s.id}
-              className={`history-item ${activeSessionId === s.id ? 'active' : ''}`}
-              onClick={() => setActiveSessionId(s.id)}
-            >
-              <span className="chat-item-text">
-                {s.isPinned && <span className="pinned-badge">📌</span>}
-                {s.title}
-              </span>
-              <div className="menu-trigger" onClick={(e) => toggleMenu(e, s.id)}>⋮</div>
-
+            <div key={s.id} className={`history-item ${activeSessionId === s.id ? 'active' : ''}`} onClick={() => setActiveSessionId(s.id)}>
+              {editingSessionId === s.id ? (
+                <input 
+                  autoFocus
+                  className="rename-input-sidebar"
+                  value={tempTitle}
+                  onChange={(e) => setTempTitle(e.target.value)}
+                  onBlur={() => {
+                    setSessions(prev => prev.map(item => item.id === s.id ? { ...item, title: tempTitle } : item));
+                    setEditingSessionId(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      setSessions(prev => prev.map(item => item.id === s.id ? { ...item, title: tempTitle } : item));
+                      setEditingSessionId(null);
+                    }
+                    if (e.key === "Escape") {
+                      setEditingSessionId(null);
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <span className="chat-item-text">
+                  {s.isPinned && <span className="pinned-badge">📌</span>}
+                  {s.title}
+                </span>
+              )}
+              
+              <div className="menu-trigger" onClick={(e) => { e.stopPropagation(); setMenuOpenId(menuOpenId === s.id ? null : s.id); }}>⋮</div>
+              
               {menuOpenId === s.id && (
                 <div className="options-dropdown" onClick={(e) => e.stopPropagation()}>
-                  <div className="dropdown-item" onClick={() => startRename(s.id, s.title)}>✏️ Rename</div>
-                  <div className="dropdown-item" onClick={() => handlePin(s.id)}>
-                    {s.isPinned ? "📍 Unpin" : "📌 Pin Chat"}
-                  </div>
-                  <div className="dropdown-item delete" onClick={(e) => handleDelete(e, s.id)}>🗑️ Delete</div>
+                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setEditingSessionId(s.id); setTempTitle(s.title); setMenuOpenId(null); }}>✏️ Rename</div>
+                  <div className="dropdown-item" onClick={(e) => { e.stopPropagation(); setSessions(prev => prev.map(item => item.id === s.id ? { ...item, isPinned: !item.isPinned } : item)); setMenuOpenId(null); }}>{s.isPinned ? "📍 Unpin" : "📌 Pin Chat"}</div>
+                  <div className="dropdown-item delete" onClick={(e) => { e.stopPropagation(); setSessions(sessions.filter(item => item.id !== s.id)); if (activeSessionId === s.id) setActiveSessionId(""); setMenuOpenId(null); }}>🗑️ Delete</div>
                 </div>
               )}
             </div>
           ))}
         </div>
-
-        <button className="logout-btn" onClick={handleLogout}>
-          Logout 🚪
-        </button>
+        <button className="logout-btn" onClick={() => { localStorage.removeItem("documind_token"); navigate("/login"); }}>Logout 🚪</button>
       </aside>
 
       <main className="chat-section">
-        <div className="chat-content-container">
-          <header className="chat-header">
-            <h1>DocuMind AI 🤖</h1>
-            <div className="upload-card">
-              <input type="file" onChange={(e) => setFile(e.target.files[0])} />
-              <button className="primary-btn" onClick={handleUpload}>
-                ✨ Upload PDF
-              </button>
-            </div>
+        {/* 💡 Everglow Edison Bulb Theme Toggle — Definitive Minimalist Asset */}
+        <button className="theme-toggle-btn" onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} title="Toggle Light/Dark">
+          <img 
+            src={theme === 'light' ? '/bulb_on_light.png' : '/bulb_on_dark.png'} 
+            className={`modern-bulb-premium ${theme}`} 
+            alt="Theme Switch"
+          />
+        </button>
 
-            <div className="quick-actions">
-              <button onClick={() => askAI("Summarize this document in 3-5 concise sentences.")}>✨ Summarize</button>
-              <button onClick={() => askAI("What are the 5 most important key points from this document?")}>📌 Key Points</button>
-              <button onClick={() => askAI("Explain the core concept of this document in simple terms.")}>🧠 Explain</button>
-              <button onClick={() => askAI("What are the deepest AI-generated insights or opportunities mentioned here?")}>💡 Insights</button>
+        <div className="chat-content-container">
+          <header className="chat-header-compact">
+            <h1>DocuMind AI 🤖</h1>
+            
+            {/* ⚡ Quick Actions (Enabled strictly after upload) */}
+            <div className={`quick-actions-bar ${!isUploaded ? 'locked' : ''}`}>
+              <button onClick={() => askAI("Summarize all uploaded documents in 3-5 concise sentences.")} disabled={!isUploaded}>
+                📄 Summarize All
+              </button>
+              <button onClick={() => askAI("What are the most important key points aggregated from these documents?")} disabled={!isUploaded}>
+                📍 Key Insights
+              </button>
+              <button onClick={() => askAI("What are the deepest AI-generated opportunities mentioned across these files?")} disabled={!isUploaded}>
+                🔍 Advanced Analysis
+              </button>
             </div>
           </header>
 
           <div className="chat-box" ref={chatBoxRef}>
             {messages.length === 0 && !loading && (
-              <div className="ai" style={{ alignSelf: 'center', textAlign: 'center', opacity: 0.6, background: 'transparent', boxShadow: 'none' }}>
-                Welcome! Start a new conversation or upload a PDF. ✨
+              <div className="ai welcome-message">
+                Welcome to the future of document analysis. Select PDFs in the sidebar to begin. ✨
               </div>
             )}
             {messages.map((msg, i) => (
-              <div key={i} className={msg.role}>{msg.text}</div>
+              <div key={i} className={`${msg.role} message-wrapper`}>
+                {editingIndex === i ? (
+                  <div className="inline-edit-container">
+                    <textarea className="inline-edit-textarea" value={editDraft} onChange={(e) => setEditDraft(e.target.value)} />
+                    <div className="inline-edit-actions">
+                      <button onClick={() => saveEdit(i)}>Save</button>
+                      <button onClick={() => setEditingIndex(null)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {msg.text}
+                    {msg.role === "ai" && (
+                      <>
+                        <div className="message-action-bar">
+                          <button onClick={() => startEditing(i, msg.text)} title="Edit Report">✏️</button>
+                          <button onClick={() => { setReportValue(msg.text); setIsReportOpen(true); }} title="Full Screen">🔍</button>
+                          <button onClick={() => exportToWord(msg.text)} title="Export to Word">📥</button>
+                        </div>
+                        <div className="message-feedback-footer">
+                          <button className="feedback-btn" onClick={() => { navigator.clipboard.writeText(msg.text); alert("Copied to clipboard! 📋"); }} title="Copy to Clipboard">📋</button>
+                          <button className="feedback-btn" onClick={(e) => triggerSprinkle(e, "😊")} title="Good Response">😊</button>
+                          <button className="feedback-btn" onClick={(e) => triggerSprinkle(e, "😞")} title="Bad Response">😞</button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             ))}
             {loading && <div className="ai"><span className="dot-animation">AI is thinking...</span></div>}
           </div>
 
           <footer className="chat-footer">
             <div className="input-box">
-              <input
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAsk()}
-                placeholder="Ask DocuMind AI..."
-              />
+              <input value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleAsk()} placeholder="Ask anything about your documents..." />
               <button className="send-btn" onClick={handleAsk}>➤</button>
             </div>
           </footer>
         </div>
       </main>
+
+      {/* 🎇 Global Sprinkle Overlay */}
+      {sprinkles.map(s => (
+        <span 
+          key={s.id} 
+          className="sprinkle-emoji" 
+          style={{ 
+            left: s.x, 
+            top: s.y, 
+            "--vx": `${s.vx}px`, 
+            "--vy": `${s.vy}px`, "--rotate": `${s.rotate}deg` 
+          }}
+        >
+          {s.emoji}
+        </span>
+      ))}
+
+      <FilePreviewModal isOpen={isPreviewOpen} onClose={closePreview} url={previewUrl} fileName={previewFileName} />
+      <ReportModal isOpen={isReportOpen} onClose={() => setIsReportOpen(false)} text={reportValue} onSave={(val) => {
+        setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: s.messages.map(m => m.text === reportValue ? { ...m, text: val } : m) } : s));
+        setIsReportOpen(false);
+      }} />
     </div>
   );
 }
 
-// Final App with Routing
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <ChatInterface />
-            </ProtectedRoute>
-          }
-        />
-        {/* Redirect any other path to home/chat */}
+        <Route path="/" element={<ProtectedRoute><ChatInterface /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );
 }
-
 export default App;
