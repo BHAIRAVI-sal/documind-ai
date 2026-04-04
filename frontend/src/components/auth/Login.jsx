@@ -40,9 +40,9 @@ const Login = () => {
     <div className="auth-split">
       {/* LEFT — Illustration Panel */}
       <div className="auth-hero">
-        <img src="/astronaut.png" alt="DocuMind AI" className="auth-hero-img" />
+        <img src="/astronaut.png" alt="InsightLens" className="auth-hero-img" />
         <div className="auth-hero-overlay">
-          <h2>Welcome to<br />DocuMind AI</h2>
+          <h2>Welcome to<br />InsightLens</h2>
           <p>Your AI companion for smarter documents</p>
         </div>
       </div>
@@ -51,8 +51,8 @@ const Login = () => {
       <div className="auth-container">
         <div className="auth-card">
           <div className="auth-header">
-            <h1>Welcome Back</h1>
-            <p className="auth-subtitle">Sign in to continue to DocuMind AI</p>
+            <h1 className="brand-title-auth">Insight<span className="brand-accent-auth">Lens</span></h1>
+            <p className="auth-subtitle">Sign in to continue to InsightLens</p>
           </div>
 
           <form onSubmit={handleLogin} className="auth-form">

@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
+    username: "",
     full_name: "",
     email: "",
     password: "",
@@ -30,6 +31,7 @@ const Signup = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          username: formData.username,
           full_name: formData.full_name,
           email: formData.email,
           password: formData.password,
@@ -56,7 +58,7 @@ const Signup = () => {
     <div className="auth-split">
       {/* LEFT — Illustration Panel */}
       <div className="auth-hero">
-        <img src="/astronaut.png" alt="DocuMind AI" className="auth-hero-img" />
+        <img src="/astronaut.png" alt="InsightLens" className="auth-hero-img" />
         <div className="auth-hero-overlay">
           <h2>Start Your<br />Journey Today</h2>
           <p>Join thousands using AI-powered documents</p>
@@ -67,11 +69,23 @@ const Signup = () => {
       <div className="auth-container">
         <div className="auth-card">
           <div className="auth-header">
-            <h1>Create Account</h1>
-            <p className="auth-subtitle">Get started with DocuMind AI for free</p>
+            <h1 className="brand-title-auth">Insight<span className="brand-accent-auth">Lens</span></h1>
+            <p className="auth-subtitle">Get started with InsightLens for free</p>
           </div>
 
           <form onSubmit={handleSignup} className="auth-form">
+            <div className="form-group">
+              <label>Choose Username</label>
+              <input
+                name="username"
+                type="text"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="e.g. jdoe123"
+                required
+              />
+            </div>
+
             <div className="form-group">
               <label>Full Name</label>
               <input

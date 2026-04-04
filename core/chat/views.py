@@ -8,6 +8,7 @@ import requests
 from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from .serializers import ChatHistorySerializer
 
 class ChatWithDocumentView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -65,10 +66,9 @@ class ChatWithDocumentView(APIView):
             {question}
             """
 
-            # 🧪 [TEST MODE] SINGLE-TIER HUGGINGFACE DIAGNOSTIC
+            # 🔥 [BACKEND AI ENGINE] FULL PRODUCTION PIPELINE
             answer = None
 
-            """
             # --- TIER 1: PRIMARY (Gemini) ---
             try:
                 print("🚀 Trying Gemini...")
@@ -84,6 +84,7 @@ class ChatWithDocumentView(APIView):
                         raw_text = result['candidates'][0]['content']['parts'][0]['text']
                         if raw_text and len(raw_text.strip()) > 20: 
                             answer = raw_text.strip()
+                            print("✅ Gemini Success")
                     except (KeyError, IndexError):
                         print("❌ Gemini returned empty/invalid")
                 else:
@@ -112,20 +113,20 @@ class ChatWithDocumentView(APIView):
                             raw_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
                             if raw_text and len(raw_text.strip()) > 20:
                                 answer = raw_text.strip()
+                                print("✅ Grok Success")
                         else:
                             print(f"❌ Grok Failed (Status {response.status_code}): {response.text[:100]}")
                     else:
                         print("⚠️ Grok key missing")
                 except Exception as e:
                     print("ERROR:", str(e))
-            """
 
-            # --- TIER 3: HUGGINGFACE (ONLY ACTIVE TIER FOR DIAGNOSIS) ---
+            # --- TIER 3: FALLBACK 2 (HuggingFace) ---
             if not answer:
                 try:
-                    print("🚀 Trying HuggingFace (Mistral-7B-Instruct)...")
+                    print("🚀 Trying HuggingFace...")
                     if settings.HUGGINGFACE_API_KEY:
-                        # 💎 Upgrading to Mistral-7B for better instruction following
+                        # 💎 Using Mistral-7B-Instruct-v0.2 as the final line of defense
                         url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
                         headers = {"Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}"}
                         data = {
@@ -138,26 +139,22 @@ class ChatWithDocumentView(APIView):
                         result = response.json()
                         print("HF RAW:", result)
                         
-                        # 🧩 STEP 1: EXTRACT RAW TEXT
+                        # 🧩 Extract and Clean
                         raw_text = ""
                         if isinstance(result, list) and len(result) > 0:
                             raw_text = result[0].get("generated_text", "")
                         elif isinstance(result, dict):
                             raw_text = result.get("generated_text", "")
                         
-                        # 🧹 STEP 2: CLEANING & ECHO-CANCELLATION
                         cleaned = raw_text.strip()
                         if "Question:" in cleaned:
                             cleaned = cleaned.split("Question:")[-1].strip()
                         
-                        print("HF CLEANED:", cleaned)
-
-                        # ✅ STEP 3: VALIDATE & ASSIGN
-                        if cleaned and len(cleaned) > 10:
+                        if cleaned and len(cleaned) > 20:
                             answer = cleaned
+                            print("✅ HuggingFace Success")
                         else:
-                            # 🛡️ STEP 4: FORCE RESPONSE IF EMPTY/SHORT
-                            answer = f"I've analyzed your question: '{question}'. While I'm currently in high-load mode, I recommend checking the document context in the sidebar for specific details. Your documents are fully processed and ready."
+                            print("❌ HF returned empty/unusable")
                     else:
                         print("⚠️ HF key missing")
                 except Exception as e:
@@ -165,7 +162,7 @@ class ChatWithDocumentView(APIView):
 
             # --- FINAL RESOLUTION ---
             if not answer:
-                print("🚨 ALL ATTEMPTS FAILED.")
+                print("🚨 ALL AI TIERS FAILED.")
                 answer = "AI services temporarily unavailable. Please try again."
 
             print("FINAL ANSWER:", answer)
@@ -187,14 +184,9 @@ class ChatHistoryView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        chats = ChatMessage.objects.filter(user=request.user).order_by('-created_at')
-
-        data = []
-        for chat in chats:
-            data.append({
-                "question": chat.question,
-                "answer": chat.answer,
-                "time": chat.created_at
-            })
-
-        return Response(data)
+        try:
+            chats = ChatMessage.objects.filter(user=request.user).order_by('-created_at')
+            serializer = ChatHistorySerializer(chats, many=True)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

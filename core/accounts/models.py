@@ -3,32 +3,32 @@ from django.db import models
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, full_name, password=None, **extra_fields):
-        if not email:
-            raise ValueError("Email is required")
+    def create_user(self, username, email, full_name, password=None, **extra_fields):
+        if not username:
+            raise ValueError("Username is required")
 
         email = self.normalize_email(email)
-        user = self.model(email=email, full_name=full_name, **extra_fields)
+        user = self.model(username=username, email=email, full_name=full_name, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, email, full_name, password=None, **extra_fields):
+    def create_superuser(self, username, email, full_name, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
         extra_fields.setdefault('is_superuser', True)
 
-        return self.create_user(email, full_name, password, **extra_fields)
+        return self.create_user(username, email, full_name, password, **extra_fields)
 
 
 class User(AbstractUser):
-    username = None  # remove username
+    username = models.CharField(max_length=150, unique=True)
     email = models.EmailField(unique=True)
 
     full_name = models.CharField(max_length=255)
     is_verified = models.BooleanField(default=False)
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['full_name']
+    REQUIRED_FIELDS = ['username', 'full_name']
 
     objects = UserManager()
 

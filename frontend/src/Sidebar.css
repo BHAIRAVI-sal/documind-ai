@@ -1,0 +1,80 @@
+/* Clean Sidebar Styles to resolve clickability issues */
+
+.history-item {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 10px 14px !important;
+  margin: 4px 8px !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease-in-out !important;
+  position: relative !important;
+  border: 1px solid transparent !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  z-index: auto !important; /* 💎 Fix: removed fixed z-index to allow hover lift from App.css */
+}
+
+.history-item:hover {
+  background: rgba(123, 47, 247, 0.08) !important;
+  transform: translateX(4px) !important;
+}
+
+.history-item.active {
+  background: rgba(123, 47, 247, 0.12) !important;
+  border-color: rgba(123, 47, 247, 0.3) !important;
+  box-shadow: 0 4px 15px rgba(123, 47, 247, 0.1) !important;
+}
+
+.history-item.active::before {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 8px !important;
+  bottom: 8px !important;
+  width: 4px !important;
+  background: linear-gradient(135deg, #7b2ff7 0%, #00d2ff 100%) !important;
+  border-radius: 0 4px 4px 0 !important;
+  box-shadow: 0 0 10px rgba(123, 47, 247, 0.5) !important;
+  pointer-events: none !important; /* Crytical: don't block clicks */
+}
+
+.menu-trigger {
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  cursor: pointer !important;
+  opacity: 0.6 !important;
+  transition: all 0.2s !important;
+  z-index: 100 !important; /* Max priority */
+  flex-shrink: 0 !important;
+  pointer-events: auto !important; /* Max priority */
+  background: transparent !important;
+  border: none !important;
+  font-size: 1.2rem !important;
+  color: inherit !important;
+  outline: none !important;
+}
+
+.history-item:hover .menu-trigger,
+.history-item.active .menu-trigger {
+  opacity: 1 !important;
+}
+
+.menu-trigger:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #7b2ff7 !important;
+}
+
+.history-item-content {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  overflow: hidden !important;
+  min-width: 0 !important;
+  pointer-events: none !important; /* Ensure children don't steal clicks from trigger */
+}
