@@ -22,42 +22,45 @@ class ChatWithDocumentView(APIView):
     ]
 
     def post(self, request):
-        question = request.data.get("question")
-        model = request.data.get("model", "gemini-2.5-flash")
+        # 1. Safely handle unauthenticated users
+        if not request.user or not request.user.is_authenticated:
+            return Response({"error": "Authentication required to perform document analysis."}, status=status.HTTP_401_UNAUTHORIZED)
 
-        # Validate model
-        if model not in self.ALLOWED_MODELS:
-            model = "gemini-2.5-flash"
+        question = request.data.get("question")
+        model_name = request.data.get("model", "gemini-2.5-flash")
+
+        # Validate model selection
+        if model_name not in self.ALLOWED_MODELS:
+            model_name = "gemini-2.5-flash"
 
         if not question:
             return Response({"error": "No question provided"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # 🔥 AGGREGATE TEXT FROM ALL DOCUMENTS OF THE CURRENT USER
+            # 2. Robust Document Content Extraction for the Current User
             documents = Document.objects.filter(user=request.user)
-            
             combined_text = ""
+            
             for doc in documents:
                 try:
-                    pdf_reader = PyPDF2.PdfReader(doc.file.path)
-                    file_name = doc.file.name.split('/')[-1]
-                    combined_text += f"\n\n--- DOCUMENT: {file_name} ---\n"
-                    for page in pdf_reader.pages:
-                        extracted = page.extract_text()
-                        if extracted:
-                            combined_text += extracted
-                except Exception as e:
-                    print(f"🔥 PDF extraction error for {doc.file.name}: {e}")
+                    if doc.file and hasattr(doc.file, 'path'):
+                        pdf_reader = PyPDF2.PdfReader(doc.file.path)
+                        file_name = doc.file.name.split('/')[-1]
+                        combined_text += f"\n\n--- DOCUMENT: {file_name} ---\n"
+                        for page in pdf_reader.pages:
+                            text = page.extract_text()
+                            if text:
+                                combined_text += text
+                except Exception as extraction_err:
+                    print(f"PDF extraction error for {doc.id}: {str(extraction_err)}")
 
-            # Cap context to 30,000 chars (Gemini Flash can handle much more, but we stay efficient)
-            context = combined_text[:30000] if combined_text else "No document content available."
+            # Cap context to prevent token overflows (approx 30k chars)
+            context = combined_text[:30000] if combined_text else "No document content provided by user."
 
-            # 🔥 PROMPT
             prompt = f"""
-            You are a helpful AI assistant.
-            The user has provided one or more documents as reference.
-            Use the context from ALL documents below to answer the question.
-            If the context is empty or not provided, answer based on your general knowledge.
+            You are a helpful senior AI research assistant.
+            Use the context from the documents provided below to answer the user's question.
+            If the context is insufficient, use your broad internal knowledge while prioritizing document facts.
             
             Document Context:
             {context}
@@ -66,118 +69,99 @@ class ChatWithDocumentView(APIView):
             {question}
             """
 
-            # 🔥 [BACKEND AI ENGINE] FULL PRODUCTION PIPELINE
             answer = None
 
-            # --- TIER 1: PRIMARY (Gemini) ---
-            try:
-                print("🚀 Trying Gemini...")
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
-                data = {"contents": [{"parts": [{"text": prompt}]}]}
-                response = requests.post(url, json=data, timeout=12)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    print("Gemini RAW:", result)
-                    
-                    try:
-                        raw_text = result['candidates'][0]['content']['parts'][0]['text']
-                        if raw_text and len(raw_text.strip()) > 20: 
-                            answer = raw_text.strip()
-                            print("✅ Gemini Success")
-                    except (KeyError, IndexError):
-                        print("❌ Gemini returned empty/invalid")
-                else:
-                    print(f"❌ Gemini Failed (Status {response.status_code}): {response.text[:100]}")
-            except Exception as e:
-                print("ERROR:", str(e))
-
-            # --- TIER 2: FALLBACK 1 (Grok) ---
-            if not answer:
+            # 3. AI Multi-Tier Pipeline - Tier 1: Gemini (Primary)
+            gemini_api_key = getattr(settings, 'GEMINI_API_KEY', None)
+            if gemini_api_key:
                 try:
-                    print("🚀 Trying Grok...")
-                    if settings.GROK_API_KEY:
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_api_key}"
+                    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                    headers = {"Content-Type": "application/json"}
+                    
+                    response = requests.post(url, json=payload, headers=headers, timeout=15)
+                    if response.status_code == 200:
+                        res_json = response.json()
+                        candidates = res_json.get('candidates', [])
+                        if candidates:
+                            parts = candidates[0].get('content', {}).get('parts', [])
+                            if parts:
+                                raw_answer = parts[0].get('text', '').strip()
+                                if len(raw_answer) > 5:
+                                    answer = raw_answer
+                except Exception as e:
+                    print(f"Gemini API Exception: {str(e)}")
+
+            # 4. AI Multi-Tier Pipeline - Tier 2: Grok Fallback
+            if not answer:
+                grok_key = getattr(settings, 'GROK_API_KEY', None)
+                if grok_key:
+                    try:
                         url = "https://api.x.ai/v1/chat/completions"
-                        headers = {"Authorization": f"Bearer {settings.GROK_API_KEY}", "Content-Type": "application/json"}
+                        headers = {"Authorization": f"Bearer {grok_key}", "Content-Type": "application/json"}
                         data = {
                             "messages": [{"role": "user", "content": prompt}],
-                            "model": "grok-2", 
+                            "model": "grok-2",
                             "stream": False
                         }
-                        response = requests.post(url, json=data, headers=headers, timeout=12)
-                        
+                        response = requests.post(url, json=data, headers=headers, timeout=15)
                         if response.status_code == 200:
-                            result = response.json()
-                            print("Grok RAW:", result)
-                            
-                            raw_text = result.get("choices", [{}])[0].get("message", {}).get("content", "")
-                            if raw_text and len(raw_text.strip()) > 20:
-                                answer = raw_text.strip()
-                                print("✅ Grok Success")
-                        else:
-                            print(f"❌ Grok Failed (Status {response.status_code}): {response.text[:100]}")
-                    else:
-                        print("⚠️ Grok key missing")
-                except Exception as e:
-                    print("ERROR:", str(e))
+                            res_json = response.json()
+                            raw_answer = res_json.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                            if len(raw_answer) > 5:
+                                answer = raw_answer
+                    except Exception as e:
+                        print(f"Grok API Exception: {str(e)}")
 
-            # --- TIER 3: FALLBACK 2 (HuggingFace) ---
+            # 5. AI Multi-Tier Pipeline - Tier 3: HuggingFace Fallback
             if not answer:
-                try:
-                    print("🚀 Trying HuggingFace...")
-                    if settings.HUGGINGFACE_API_KEY:
-                        # 💎 Using Mistral-7B-Instruct-v0.2 as the final line of defense
+                hf_key = getattr(settings, 'HUGGINGFACE_API_KEY', None)
+                if hf_key:
+                    try:
                         url = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2"
-                        headers = {"Authorization": f"Bearer {settings.HUGGINGFACE_API_KEY}"}
+                        headers = {"Authorization": f"Bearer {hf_key}"}
                         data = {
-                            "inputs": prompt, 
+                            "inputs": prompt,
                             "parameters": {"max_new_tokens": 512, "return_full_text": False},
                             "options": {"wait_for_model": True}
                         }
-                        
                         response = requests.post(url, json=data, headers=headers, timeout=20)
-                        result = response.json()
-                        print("HF RAW:", result)
-                        
-                        # 🧩 Extract and Clean
-                        raw_text = ""
-                        if isinstance(result, list) and len(result) > 0:
-                            raw_text = result[0].get("generated_text", "")
-                        elif isinstance(result, dict):
-                            raw_text = result.get("generated_text", "")
-                        
-                        cleaned = raw_text.strip()
-                        if "Question:" in cleaned:
-                            cleaned = cleaned.split("Question:")[-1].strip()
-                        
-                        if cleaned and len(cleaned) > 20:
-                            answer = cleaned
-                            print("✅ HuggingFace Success")
-                        else:
-                            print("❌ HF returned empty/unusable")
-                    else:
-                        print("⚠️ HF key missing")
-                except Exception as e:
-                    print("ERROR:", str(e))
+                        if response.status_code == 200:
+                            res_json = response.json()
+                            raw_text = ""
+                            if isinstance(res_json, list) and len(res_json) > 0:
+                                raw_text = res_json[0].get("generated_text", "")
+                            elif isinstance(res_json, dict):
+                                raw_text = res_json.get("generated_text", "")
+                            
+                            cleaned = raw_text.strip()
+                            if "Question:" in cleaned:
+                                cleaned = cleaned.split("Question:")[-1].strip()
+                            if len(cleaned) > 5:
+                                answer = cleaned
+                    except Exception as e:
+                        print(f"HuggingFace API Exception: {str(e)}")
 
-            # --- FINAL RESOLUTION ---
+            # 6. Final Stability Handshake - Ensure a response is always returned
             if not answer:
-                print("🚨 ALL AI TIERS FAILED.")
-                answer = "AI services temporarily unavailable. Please try again."
+                answer = "I'm currently experiencing high traffic or connectivity issues with my AI processing tiers. Please try your request again in a moment."
 
-            print("FINAL ANSWER:", answer)
+            # 7. Safe Object Creation (Final Integrity Safeguard)
+            if request.user and request.user.is_authenticated:
+                ChatMessage.objects.create(
+                    user=request.user,
+                    question=question,
+                    answer=answer
+                )
 
-            # 🔥 SAVE CHAT FOR CURRENT USER
-            ChatMessage.objects.create(
-                user=request.user,
-                question=question,
-                answer=answer
+            return Response({"answer": answer}, status=status.HTTP_200_OK)
+
+        except Exception as global_err:
+            print(f"CRITICAL 500 ERROR: {str(global_err)}")
+            return Response(
+                {"error": "An unexpected server error occurred while analyzing your docs."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-            return Response({"answer": answer})
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ChatHistoryView(APIView):

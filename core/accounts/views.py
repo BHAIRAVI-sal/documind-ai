@@ -17,6 +17,7 @@ class RegisterView(APIView):
                 "message": "User registered successfully",
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
+                "email": user.email,
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -36,6 +37,7 @@ class LoginView(APIView):
                 "message": "Login successful",
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
+                "email": user.email,
             }, status=status.HTTP_200_OK)
         
         print(f"DEBUG: Login failed for email: {email}")
