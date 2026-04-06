@@ -41,6 +41,9 @@ const Signup = () => {
       const data = await response.json();
 
       if (response.ok) {
+        localStorage.setItem("documind_token", data.access);
+        localStorage.setItem("documind_refresh", data.refresh);
+        localStorage.setItem("documind_user_email", data.email);
         alert("Account created successfully! Please login.");
         navigate("/login");
       } else {

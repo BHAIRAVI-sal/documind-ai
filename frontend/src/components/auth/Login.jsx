@@ -25,6 +25,7 @@ const Login = () => {
       if (response.ok) {
         localStorage.setItem("documind_token", data.access);
         localStorage.setItem("documind_refresh", data.refresh);
+        localStorage.setItem("documind_user_email", data.email);
         navigate("/");
       } else {
         setError(data.error || "Invalid credentials");

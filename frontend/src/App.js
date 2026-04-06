@@ -91,13 +91,19 @@ const ReportModal = ({ isOpen, onClose, text, onSave }) => {
 // Main Chat Component
 function ChatInterface() {
   const navigate = useNavigate();
+  const userEmail = localStorage.getItem("documind_user_email") || "";
+  const SESSIONS_KEY = `documind_sessions_${userEmail}`;
+  const ACTIVE_SESSION_KEY = `documind_active_session_id_${userEmail}`;
+
   const [sessions, setSessions] = useState(() => {
-    const saved = localStorage.getItem("documind_sessions");
+    if (!userEmail) return [];
+    const saved = localStorage.getItem(SESSIONS_KEY);
     return saved ? JSON.parse(saved) : [];
   });
 
   const [activeSessionId, setActiveSessionId] = useState(() => {
-    return localStorage.getItem("documind_active_session_id") || "";
+    if (!userEmail) return "";
+    return localStorage.getItem(ACTIVE_SESSION_KEY) || "";
   });
 
   const [theme, setTheme] = useState(localStorage.getItem("documind_theme") || "light");
@@ -176,11 +182,12 @@ function ChatInterface() {
   }, [sessions, activeSessionId, loading]);
 
   useEffect(() => {
-    localStorage.setItem("documind_sessions", JSON.stringify(sessions));
+    if (!userEmail) return;
+    localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions));
     if (activeSessionId) {
-      localStorage.setItem("documind_active_session_id", activeSessionId);
+      localStorage.setItem(ACTIVE_SESSION_KEY, activeSessionId);
     }
-  }, [sessions, activeSessionId]);
+  }, [sessions, activeSessionId, userEmail, SESSIONS_KEY, ACTIVE_SESSION_KEY]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -255,8 +262,8 @@ function ChatInterface() {
         if (sessions.length === 0) handleNewChat();
       }
     };
-    syncHistory();
-  }, [handleNewChat, sessions.length]);
+    if (userEmail) syncHistory();
+  }, [handleNewChat, userEmail]);
 
   const askAI = async (customQuestion, showInChat = true) => {
     if (!activeSessionId) return;
