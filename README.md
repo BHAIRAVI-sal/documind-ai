@@ -1,3 +1,52 @@
+User login with a modern and intuitive UI/UX for a seamless experience.
+<img width="1919" height="922" alt="image" src="https://github.com/user-attachments/assets/faa7896c-fc90-4bcf-8ca9-cc6815fa7ccd" />
+
+User registration with a clean and modern UI/UX for a smooth onboarding experience.
+<img width="1918" height="947" alt="image" src="https://github.com/user-attachments/assets/1bc5d2f6-84b6-458d-a979-84a84e384f18" />
+
+AI-powered document analysis with an interactive chat interface for smarter insights.
+<img width="1600" height="774" alt="image" src="https://github.com/user-attachments/assets/e3f1ab18-7669-4ec6-9561-f098ac89c0d3" />
+
+Supports simultaneous upload of multiple PDFs for efficient document processing.
+<img width="1919" height="945" alt="image" src="https://github.com/user-attachments/assets/a11bff59-c28f-4e25-8725-baadded666ed" />
+<img width="1918" height="924" alt="image" src="https://github.com/user-attachments/assets/a8e24c86-8079-4089-bd67-fbdd514d43fa" />
+
+Generate concise summaries of multiple uploaded PDFs simultaneously for quick insights.
+<img width="1919" height="936" alt="image" src="https://github.com/user-attachments/assets/b1da0bfd-9ceb-4d95-9cd1-fcd697e264f9" />
+
+Extract key insights and perform advanced analysis on uploaded documents for deeper understanding.
+<img width="1919" height="934" alt="image" src="https://github.com/user-attachments/assets/4199679f-53e0-499e-ad1a-7cb4b9865e7a" />
+
+Allows users to edit AI-generated responses for improved accuracy and customization.
+<img width="1918" height="942" alt="image" src="https://github.com/user-attachments/assets/2afb9a27-eef5-4fae-a25c-9b876069a690" />
+
+Enables zoomed view of responses for enhanced readability and detailed analysis.
+<img width="1919" height="925" alt="image" src="https://github.com/user-attachments/assets/10b45c37-5bb7-4eb9-9463-ebe705b64090" />
+
+Export analyzed content to Word format for easy sharing and documentation.
+<img width="1919" height="912" alt="image" src="https://github.com/user-attachments/assets/db0d38a7-f2e1-4e8d-a0e4-533735bc7fd3" />
+
+Allows users to quickly copy generated responses for easy reuse and sharing.
+<img width="1919" height="944" alt="image" src="https://github.com/user-attachments/assets/c2d43cd9-3ee2-48db-ad87-09d201981f2e" />
+
+Enables users to provide feedback on AI-generated responses
+<img width="1919" height="922" alt="image" src="https://github.com/user-attachments/assets/b22e5e2d-ad79-4dfd-8198-6691342aedce" />
+
+Supports negative feedback on responses
+<img width="1919" height="953" alt="image" src="https://github.com/user-attachments/assets/81929c90-dc97-4da7-b8a8-4cffee522eed" />
+
+Supports both light and dark modes for an enhanced and customizable user experience.
+<img width="1919" height="931" alt="image" src="https://github.com/user-attachments/assets/52e0d9fe-4d9d-4133-80e8-a943752956fe" />
+
+Allows users to save chats with options to rename, pin, and delete for better conversation management.
+<img width="1919" height="947" alt="image" src="https://github.com/user-attachments/assets/b4360f66-9bd9-42b6-bff4-3c3fc60f5df9" />
+
+Allows users to upload documents directly from the search bar for quick and seamless access.
+<img width="1919" height="933" alt="image" src="https://github.com/user-attachments/assets/f0c20f2f-fa51-4fb0-ae90-41e406cb7879" />
+
+Provides a secure logout option to safely end user sessions.
+<img width="1919" height="892" alt="image" src="https://github.com/user-attachments/assets/9851ecb5-9727-4f68-9413-e4f2743f894e" />
+
 # InsightLens - DocuMind AI
 
 InsightLens is a premium AI-powered document analysis platform that transforms how you interact with your PDFs. It uses a sophisticated multi-AI pipeline to analyze complex documents and provides deep insights through an intuitive, theme-aware chat interface.
